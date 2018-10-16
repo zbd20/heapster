@@ -38,7 +38,7 @@ const (
 /*
 	Usage:
 	--sink=sls:https://sls.aliyuncs.com?logStore=[your_log_store]&project=[your_project_name]
- */
+*/
 type SLSSink struct {
 	client   *sls.Client
 	Project  string
@@ -68,7 +68,7 @@ func (s *SLSSink) ExportEvents(batch *core.EventBatch) {
 	for _, event := range batch.Events {
 		log := &sls.Log{}
 
-		time := uint32(event.EventTime.Unix())
+		time := uint32(event.LastTimestamp.Unix())
 
 		log.Time = &time
 
