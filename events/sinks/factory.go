@@ -26,6 +26,7 @@ import (
 	"k8s.io/heapster/events/sinks/kafka"
 	"k8s.io/heapster/events/sinks/log"
 	"k8s.io/heapster/events/sinks/riemann"
+	"k8s.io/heapster/events/sinks/sls"
 
 	"github.com/golang/glog"
 	"k8s.io/heapster/events/sinks/dingtalk"
@@ -52,6 +53,8 @@ func (this *SinkFactory) Build(uri flags.Uri) (core.EventSink, error) {
 		return honeycomb.NewHoneycombSink(&uri.Val)
 	case "dingtalk":
 		return dingtalk.NewDingTalkSink(&uri.Val)
+	case "sls":
+		return sls.NewSLSSink(&uri.Val)
 	default:
 		return nil, fmt.Errorf("Sink not recognized: %s", uri.Key)
 	}
