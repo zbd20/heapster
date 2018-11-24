@@ -23,6 +23,7 @@ import (
 	"k8s.io/api/core/v1"
 	"k8s.io/heapster/events/core"
 	metrics_core "k8s.io/heapster/metrics/core"
+	"log"
 	"net/url"
 	"os"
 	"strconv"
@@ -38,9 +39,9 @@ const (
 /*
 	Usage:
 	--sink=sls:https://sls.aliyuncs.com?logStore=[your_log_store]&project=[your_project_name]
- */
+*/
 type SLSSink struct {
-	client   *sls.Client
+	Config   *Config
 	Project  string
 	LogStore string
 }
@@ -68,7 +69,7 @@ func (s *SLSSink) ExportEvents(batch *core.EventBatch) {
 	for _, event := range batch.Events {
 		log := &sls.Log{}
 
-		time := uint32(event.EventTime.Unix())
+		time := uint32(event.LastTimestamp.Unix())
 
 		log.Time = &time
 
@@ -86,7 +87,7 @@ func (s *SLSSink) ExportEvents(batch *core.EventBatch) {
 		},
 	}
 
-	err := s.client.PutLogs(request)
+	err := s.client().PutLogs(request)
 	if err != nil {
 		glog.Errorf("failed to put events to sls,because of %s", err.Error())
 	}
@@ -137,6 +138,15 @@ func (s *SLSSink) eventToContents(event *v1.Event) []*sls.Log_Content {
 	return contents
 }
 
+func (s *SLSSink) client() *sls.Client {
+	c, e := newClient(s.Config)
+	if e != nil {
+		log.Fatalf("can not create sls client because of %s", e.Error())
+		return nil
+	}
+	return c
+}
+
 // NewSLSSink returns new SLSSink
 func NewSLSSink(uri *url.URL) (*SLSSink, error) {
 	s := &SLSSink{}
@@ -147,14 +157,7 @@ func NewSLSSink(uri *url.URL) (*SLSSink, error) {
 
 	s.Project = c.project
 	s.LogStore = c.logStore
-
-	client, err := newClient(c)
-	if err != nil {
-		return nil, err
-	}
-
-	s.client = client
-
+	s.Config = c
 	return s, nil
 }
 
