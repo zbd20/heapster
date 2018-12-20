@@ -18,22 +18,29 @@ import (
 	"bytes"
 	"encoding/json"
 	"fmt"
+	"net/http"
+	"net/url"
+	"time"
+
+	"github.com/facebookarchive/inmem"
 	"github.com/golang/glog"
 	"k8s.io/api/core/v1"
 	"k8s.io/heapster/events/core"
-	"net/http"
-	"net/url"
 )
 
 const (
-	DINGTALK_SINK         = "DingTalkSink"
-	WARNING           int = 2
-	NORMAL            int = 1
-	DEFAULT_MSG_TYPE      = "text"
-	CONTENT_TYPE_JSON     = "application/json"
-	MSG_TEMPLATE          = "Level:%s \nNamespace:%s \nName:%s \nMessage:%s \nReason:%s \nTimestamp:%s"
-	LABE_TEMPLATE         = "%s\n"
+	DINGTALK_SINK                 = "DingTalkSink"
+	WARNING                   int = 2
+	NORMAL                    int = 1
+	DEFAULT_MSG_TYPE              = "text"
+	CONTENT_TYPE_JSON             = "application/json"
+	MSG_TEMPLATE                  = "Level:%s \nNamespace:%s \nName:%s \nMessage:%s \nReason:%s \nTimestamp:%s"
+	MSG_RECORDER_KEY_TEMPLATE     = "%s%s%s%s%s"
+	LABE_TEMPLATE                 = "%s\n"
+	MAX_RECORDER                  = 100
 )
+
+var recorder = inmem.NewUnlocked(MAX_RECORDER)
 
 /**
 dingtalk msg struct
@@ -72,7 +79,9 @@ func (d *DingTalkSink) Stop() {
 func (d *DingTalkSink) ExportEvents(batch *core.EventBatch) {
 	for _, event := range batch.Events {
 		if d.isEventLevelDangerous(event.Type) {
-			d.Ding(event)
+			if _, ok := recorder.Get(generateKey(event)); !ok {
+				d.Ding(event)
+			}
 		}
 	}
 }
@@ -105,6 +114,9 @@ func (d *DingTalkSink) Ding(event *v1.Event) {
 		glog.Errorf("failed to send msg to dingtalk,because of %s", err.Error())
 		return
 	}
+
+	// if send success ，then add recoreder
+	recorder.Add(generateKey(event), 1, time.Now().Add(time.Second*5))
 }
 
 func getLevel(level string) int {
@@ -160,4 +172,8 @@ func NewDingTalkSink(uri *url.URL) (*DingTalkSink, error) {
 	}
 
 	return d, nil
+}
+
+func generateKey(event *v1.Event) string {
+	return fmt.Sprintf(MSG_RECORDER_KEY_TEMPLATE, event.Type, event.Namespace, event.Name, event.Message, event.Reason)
 }
