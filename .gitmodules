@@ -1,0 +1,9 @@
+[submodule "aliyungo"]
+	path = aliyungo
+	url = https://github.com/denverdino/aliyungo
+[submodule "inmem"]
+	path = inmem
+	url = https://github.com/facebookarchive/inmem
+[submodule "vendor/github.com/facebookarchive"]
+	path = vendor/github.com/facebookarchive
+	url = https://github.com/facebookarchive/inmem
