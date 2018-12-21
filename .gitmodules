@@ -10,3 +10,6 @@
 [submodule "vendor/github.com/vendor/github.com/denverdino"]
 	path = vendor/github.com/vendor/github.com/denverdino
 	url = https://github.com/denverdino/aliyungo
+[submodule "vendor/github.com/denverdino"]
+	path = vendor/github.com/denverdino
+	url = https://github.com/denverdino/aliyungo
