@@ -7,3 +7,6 @@
 [submodule "vendor/github.com/facebookarchive"]
 	path = vendor/github.com/facebookarchive
 	url = https://github.com/facebookarchive/inmem
+[submodule "vendor/github.com/vendor/github.com/denverdino"]
+	path = vendor/github.com/vendor/github.com/denverdino
+	url = https://github.com/denverdino/aliyungo
