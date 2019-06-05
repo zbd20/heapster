@@ -6,7 +6,7 @@ import (
 	"fmt"
 	"net/http"
 	"net/url"
-	"time"
+	"strings"
 
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
@@ -25,6 +25,7 @@ const (
 	AlertGroupLabel    = "group"
 	AlertLevelLabel    = "level"
 	AlertInstanceLabel = "instance"
+	AlertReasonLabel   = "reason"
 )
 
 var NotVaildAlertName error = fmt.Errorf("not valid alert name")
@@ -43,11 +44,6 @@ type Alert struct {
 
 	// Extra key/value information which does not define alert identity.
 	Annotations map[string]string `json:"annotations"`
-
-	// The known time range for this alert. Both ends are optional.
-	StartsAt     time.Time `json:"startsAt,omitempty"`
-	EndsAt       time.Time `json:"endsAt,omitempty"`
-	GeneratorURL string    `json:"generatorURL"`
 }
 
 func (a *AlertmanagerSink) Name() string {
@@ -59,11 +55,24 @@ func (a *AlertmanagerSink) Stop() {
 }
 
 func (a *AlertmanagerSink) ExportEvents(batch *core.EventBatch) {
+
+	var alerts []*Alert
 	for _, event := range batch.Events {
 		if a.isEventLevelDangerous(event.Type) {
-			a.Send(event)
+			alert, err := createAlertFromEvent(a.Cluster, event)
+			if err != nil {
+				glog.Warningf("failed to create alert from event,because of %v", event)
+				continue
+			}
+
+			alerts = append(alerts, alert)
 		}
 	}
+
+	if len(alerts) > 0 {
+		a.Send(alerts)
+	}
+
 }
 
 func NewAlertmanagerSink(uri *url.URL) (*AlertmanagerSink, error) {
@@ -109,16 +118,11 @@ func getLevel(level string) int {
 	return score
 }
 
-func (a *AlertmanagerSink) Send(event *v1.Event) {
-	alert, err := createAlertFromEvent(a.Cluster, event)
-	if err != nil {
-		glog.Warningf("failed to create alert from event,because of %v", event)
-		return
-	}
+func (a *AlertmanagerSink) Send(alerts []*Alert) {
 
-	alert_bytes, err := json.Marshal(alert)
+	alert_bytes, err := json.Marshal(alerts)
 	if err != nil {
-		glog.Warningf("failed to marshal alert %v", alert)
+		glog.Warningf("failed to marshal alert %v", alerts)
 		return
 	}
 
@@ -129,6 +133,8 @@ func (a *AlertmanagerSink) Send(event *v1.Event) {
 		glog.Errorf("failed to send msg to alertmanager,because of %s", err.Error())
 		return
 	}
+
+	glog.Infof("alert send success: %v", alerts)
 }
 
 func createAlertFromEvent(cluster string, event *v1.Event) (*Alert, error) {
@@ -140,7 +146,7 @@ func createAlertFromEvent(cluster string, event *v1.Event) (*Alert, error) {
 	}
 
 	if event.Namespace != "" {
-		labels[AlertGroupLabel] = event.Namespace
+		labels[AlertGroupLabel] = strings.ToUpper(event.Namespace)
 	}
 
 	if event.Type != "" {
@@ -152,10 +158,15 @@ func createAlertFromEvent(cluster string, event *v1.Event) (*Alert, error) {
 
 	labels[AlertClusterLabel] = cluster
 
-	alert := &Alert{
-		Labels: labels,
+	annotations := make(map[string]string)
 
-		StartsAt: event.FirstTimestamp.Time,
+	if event.Reason != "" {
+		annotations[AlertReasonLabel] = event.Reason
+	}
+
+	alert := &Alert{
+		Labels:      labels,
+		Annotations: annotations,
 	}
 
 	return alert, nil
