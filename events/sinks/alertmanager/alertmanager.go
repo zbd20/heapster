@@ -156,17 +156,14 @@ func createAlertFromEvent(cluster string, event *v1.Event) (*Alert, error) {
 		labels[AlertInstanceLabel] = event.Name
 	}
 
-	labels[AlertClusterLabel] = cluster
-
-	annotations := make(map[string]string)
-
 	if event.Reason != "" {
-		annotations[AlertReasonLabel] = event.Reason
+		labels[AlertReasonLabel] = event.Reason
 	}
 
+	labels[AlertClusterLabel] = cluster
+
 	alert := &Alert{
-		Labels:      labels,
-		Annotations: annotations,
+		Labels: labels,
 	}
 
 	return alert, nil
