@@ -43,8 +43,8 @@ fmt:
 	find . -type f -name "*.go" | grep -v "./vendor*" | xargs gofmt -s -w
 
 build: clean fmt
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o heapster k8s.io/heapster/metrics
-	GOARCH=$(ARCH) CGO_ENABLED=0 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o eventer k8s.io/heapster/events
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o heapster k8s.io/heapster/metrics
+	CGO_ENABLED=0 GOOS=linux GOARCH=amd64 go build -ldflags "$(HEAPSTER_LDFLAGS)" -o eventer k8s.io/heapster/events
 
 sanitize:
 	hooks/check_boilerplate.sh

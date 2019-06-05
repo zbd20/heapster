@@ -1,5 +1,3 @@
-FROM geekidea/alpine-a:3.8
+FROM geekidea/alpine-a:3.9
 COPY eventer /
-
-USER www:www
 ENTRYPOINT ["/eventer"]
