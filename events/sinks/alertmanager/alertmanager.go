@@ -7,7 +7,9 @@ import (
 	"net/http"
 	"net/url"
 	"strings"
+	"time"
 
+	"github.com/facebookarchive/inmem"
 	"github.com/golang/glog"
 	v1 "k8s.io/api/core/v1"
 	"k8s.io/heapster/events/core"
@@ -26,9 +28,16 @@ const (
 	AlertLevelLabel    = "level"
 	AlertInstanceLabel = "instance"
 	AlertReasonLabel   = "reason"
+
+	MAX_RECORDER              = 500
+	MSG_RECORDER_KEY_TEMPLATE = "%s%s%s%s%s"
 )
 
+var ignoreAlerts = []string{"Unhealthy"}
+
 var NotVaildAlertName error = fmt.Errorf("not valid alert name")
+
+var recorder = inmem.NewUnlocked(MAX_RECORDER)
 
 type AlertmanagerSink struct {
 	Endpoint string
@@ -59,6 +68,18 @@ func (a *AlertmanagerSink) ExportEvents(batch *core.EventBatch) {
 	var alerts []*Alert
 	for _, event := range batch.Events {
 		if a.isEventLevelDangerous(event.Type) {
+			if a.isIgnoreAlert(event) {
+				glog.Infof("skip send alert: %v, for ignore", event)
+				continue
+			}
+			if _, ok := recorder.Get(generateKey(event)); ok {
+				glog.Infof("skip send alert: %v, for not first alert at 5 minute", event)
+				continue
+			}
+
+			// then add recoreder
+			recorder.Add(generateKey(event), 1, time.Now().Add(time.Second*300))
+
 			alert, err := createAlertFromEvent(a.Cluster, event)
 			if err != nil {
 				glog.Warningf("failed to create alert from event,because of %v", event)
@@ -103,6 +124,27 @@ func (a *AlertmanagerSink) isEventLevelDangerous(level string) bool {
 		return true
 	}
 	return false
+}
+
+func (a *AlertmanagerSink) isIgnoreAlert(event *v1.Event) bool {
+	var ignore = false
+	for _, v := range ignoreAlerts {
+		if event.Reason == v {
+			ignore = true
+			continue
+		}
+	}
+	return ignore
+}
+
+func (a *AlertmanagerSink) isFirstAlertAt5Min(event *v1.Event) bool {
+	var ignore = false
+
+	if event.Reason == "" {
+		ignore = true
+	}
+
+	return ignore
 }
 
 func getLevel(level string) int {
@@ -167,4 +209,8 @@ func createAlertFromEvent(cluster string, event *v1.Event) (*Alert, error) {
 	}
 
 	return alert, nil
+}
+
+func generateKey(event *v1.Event) string {
+	return fmt.Sprintf(MSG_RECORDER_KEY_TEMPLATE, event.Type, event.Namespace, event.Name, event.Message, event.Reason)
 }
