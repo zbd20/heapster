@@ -72,13 +72,13 @@ func (a *AlertmanagerSink) ExportEvents(batch *core.EventBatch) {
 				glog.Infof("skip send alert: %v, for ignore", event)
 				continue
 			}
-			if _, ok := recorder.Get(generateKey(event)); ok {
-				glog.Infof("skip send alert: %v, for not first alert at 5 minute", event)
+			if _, ok := recorder.Get(generateKey(event)); !ok {
+				// then add recoreder
+				recorder.Add(generateKey(event), 1, time.Now().Add(time.Second*300))
+
+				glog.Infof("skip send alert: %v, for first alert at 5 minute", event)
 				continue
 			}
-
-			// then add recoreder
-			recorder.Add(generateKey(event), 1, time.Now().Add(time.Second*300))
 
 			alert, err := createAlertFromEvent(a.Cluster, event)
 			if err != nil {
